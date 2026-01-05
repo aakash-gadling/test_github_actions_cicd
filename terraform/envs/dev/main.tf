@@ -23,6 +23,7 @@ module "ecs" {
   alb_listener_arn    = module.alb.listener_arn
   target_group_arns  = module.alb.target_group_arns
   ecr_repo_urls      = module.ecr.repo_urls
+  services            = var.services
 }
 
 module "rds" {

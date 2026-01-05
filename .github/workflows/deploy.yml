@@ -33,11 +33,13 @@ jobs:
           terraform init
           terraform apply -auto-approve
 
-      - name: Output ECR Repo URLs
-        id: output_ecr
-        working-directory: terraform/envs/dev
+      - name: Get ECR repo URLs
+        id: ecr
         run: |
-          echo "repo_urls=$(terraform output -json repo_urls)" >> $GITHUB_OUTPUT
+          cd terraform/envs/dev
+          terraform output -json repo_urls -no-color \
+            | jq -c '.' \
+            | sed 's/^/repo_urls=/' >> $GITHUB_OUTPUT
 
   docker-build:
     name: Build and Push Docker Images

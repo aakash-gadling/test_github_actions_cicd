@@ -73,17 +73,20 @@ jobs:
         run: |
           for service_dir in services/*; do
             service_name=$(basename "$service_dir")
-      
-            repo=$(jq -r ".${service_name}" terraform/envs/dev/repo_urls.json)
-      
-            if [ "$repo" = "null" ]; then
+          
+            repo=$(jq -r ".\"${service_name}\"" terraform/envs/dev/repo_urls.json)
+          
+            if [ "$repo" = "null" ] || [ -z "$repo" ]; then
               echo "No ECR repo found for $service_name"
               continue
             fi
-      
+          
+            echo "Building and pushing $service_name → $repo:$COMMIT_SHA"
+          
             docker build -t "$repo:$COMMIT_SHA" "$service_dir"
             docker push "$repo:$COMMIT_SHA"
           done
+
 
   ecs-deploy:
     name: Force ECS Deployment

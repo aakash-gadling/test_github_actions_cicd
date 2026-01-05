@@ -35,6 +35,7 @@ resource "aws_ecs_service" "service" {
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.task[each.key].arn
   launch_type     = "FARGATE"
+  desired_count   = 1
 
   network_configuration {
     subnets         = var.private_subnets
@@ -48,8 +49,6 @@ resource "aws_ecs_service" "service" {
     container_port   = 80
   }
 }
-
-
 
 
 resource "aws_iam_role" "ecs_execution_role" {

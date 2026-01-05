@@ -16,5 +16,8 @@ variable "services" {
 # }
 
 output "repo_urls" {
-  value = tolist(aws_ecr_repository.repo[*].repository_url)
+  value = tolist([
+    for r in aws_ecr_repository.repo :
+    r.repository_url
+  ])
 }

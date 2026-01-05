@@ -3,7 +3,7 @@ resource "aws_lb" "this" {
   internal           = false
   load_balancer_type = "application"
   subnets            = var.subnet_ids
-  security_groups    = [aws_lb_target_group.alb.id]
+  security_groups    = [aws_security_group.alb.id]
 }
 
 resource "aws_lb_listener" "http" {

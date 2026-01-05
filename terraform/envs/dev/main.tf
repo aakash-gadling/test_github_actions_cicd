@@ -27,7 +27,7 @@ module "ecs" {
   target_group_arns  = module.alb.target_group_arns
   ecr_repo_urls      = module.ecr.repo_urls
   services            = var.services
-  alb_security_group_id = module.alb.security_group_id
+  alb_security_group_id = module.alb.alb_security_group_id
 }
 
 module "rds" {

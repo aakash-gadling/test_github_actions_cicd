@@ -80,29 +80,31 @@ jobs:
             docker push "$repo:$COMMIT_SHA"
           done
 
-
   ecs-deploy:
     name: Force ECS Deployment
     runs-on: ubuntu-latest
     needs: docker-build
-
+  
     steps:
+      - uses: actions/checkout@v3
+  
       - uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
-
+  
       - name: Force ECS Service Deployment
         run: |
           CLUSTER_NAME="ecs-cluster"
-
+  
           for service_dir in services/*; do
             service_name=$(basename "$service_dir")
             echo "Forcing deployment for $service_name"
-
+  
             aws ecs update-service \
               --cluster "$CLUSTER_NAME" \
               --service "$service_name" \
               --force-new-deployment
           done
+

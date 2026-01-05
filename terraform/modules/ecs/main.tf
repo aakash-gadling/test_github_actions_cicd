@@ -3,7 +3,8 @@ resource "aws_ecs_cluster" "this" {
 }
 
 resource "aws_ecs_task_definition" "task" {
-  for_each                 = toset(var.services)
+  for_each = toset(var.services)
+
   family                   = each.key
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
@@ -15,7 +16,7 @@ resource "aws_ecs_task_definition" "task" {
   container_definitions = jsonencode([
     {
       name  = each.key
-      image = "${aws_ecr_repository.repo[each.key].repository_url}:latest"
+      image = "${var.ecr_repo_urls[each.key]}:latest"
       portMappings = [
         {
           containerPort = 80
@@ -26,7 +27,8 @@ resource "aws_ecs_task_definition" "task" {
 }
 
 resource "aws_ecs_service" "service" {
-  for_each        = toset(var.services)
+  for_each = toset(var.services)
+
   name            = each.key
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.task[each.key].arn
@@ -35,15 +37,16 @@ resource "aws_ecs_service" "service" {
   network_configuration {
     subnets         = var.private_subnets
     assign_public_ip = false
-    security_groups = []
+    security_groups  = [aws_security_group.ecs_tasks.id]
   }
 
   load_balancer {
-    target_group_arn = var.target_group_arns[each.key]
+    target_group_arn = var.target_group_arns[each.key]   # now keys match
     container_name   = each.key
     container_port   = 80
   }
 }
+
 
 
 

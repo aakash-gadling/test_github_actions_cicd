@@ -3,6 +3,7 @@ resource "aws_lb" "this" {
   internal           = false
   load_balancer_type = "application"
   subnets            = var.subnet_ids
+  security_groups    = [aws_lb_target_group.alb.id]
 }
 
 resource "aws_lb_listener" "http" {
@@ -20,28 +21,41 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-resource "aws_lb_target_group" "tg" {
-  count    = 3
-  name     = "tg-${count.index}"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id  = var.vpc_id
+resource "aws_lb_target_group" "this" {
+  for_each = toset(var.services)
+
+  name        = each.key      # MUST match the service name
+  port        = 80
+  protocol    = "HTTP"
   target_type = "ip"
+  vpc_id      = var.vpc_id
+
+  health_check {
+    path                = "/"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    interval            = 30
+    matcher             = "200"
+  }
 }
 
+
 resource "aws_lb_listener_rule" "rules" {
-  count        = 3
+  for_each = aws_lb_target_group.this
+
   listener_arn = aws_lb_listener.http.arn
-  priority     = count.index + 1
+  priority     = 100 + index(var.services, each.key)
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.tg[count.index].arn
+    target_group_arn = each.value.arn
   }
 
   condition {
     path_pattern {
-      values = ["/service${count.index + 1}/*"]
+      values = ["/${each.key}/*"]
     }
   }
 }
+

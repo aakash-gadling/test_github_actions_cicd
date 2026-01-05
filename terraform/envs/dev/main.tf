@@ -12,10 +12,12 @@ module "ecr" {
 }
 
 module "alb" {
-  source     = "../../modules/alb"
-  vpc_id     = module.vpc.vpc_id
+  source   = "../../modules/alb"
+  vpc_id   = module.vpc.vpc_id
+  services = var.services
   subnet_ids = module.vpc.public_subnets
 }
+
 
 module "ecs" {
   source              = "../../modules/ecs"
@@ -25,9 +27,12 @@ module "ecs" {
   target_group_arns  = module.alb.target_group_arns
   ecr_repo_urls      = module.ecr.repo_urls
   services            = var.services
+  alb_security_group_id = module.alb.security_group_id
 }
 
 module "rds" {
   source          = "../../modules/rds"
   private_subnets = module.vpc.private_subnets
 }
+
+

@@ -30,13 +30,21 @@ jobs:
           terraform init
           terraform apply -auto-approve
 
-      - name: Export ECR repo URLs
-        id: ecr
+      - name: Get ECR repo URLs
+        id: output_ecr
         working-directory: terraform/envs/dev
         run: |
-          REPO_URLS=$(terraform output -json repo_urls -no-color 2>/dev/null)
-          echo "$REPO_URLS" | jq empty
-          echo "repo_urls=$REPO_URLS" >> $GITHUB_OUTPUT
+          REPO_URLS=$(terraform output -json repo_urls -no-color)
+
+          echo "Terraform repo_urls:"
+          echo "$REPO_URLS"
+
+          # Validate JSON
+          echo "$REPO_URLS" | jq .
+
+          # Write output (single line JSON)
+          echo "repo_urls=$(echo $REPO_URLS | jq -c .)" >> "$GITHUB_OUTPUT"
+
 
 
   docker-build:

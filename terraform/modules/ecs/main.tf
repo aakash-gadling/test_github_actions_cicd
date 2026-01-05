@@ -3,8 +3,8 @@ resource "aws_ecs_cluster" "this" {
 }
 
 resource "aws_ecs_task_definition" "task" {
-  count                    = 3
-  family                   = "service-${count.index}"
+  for_each                 = toset(var.services)
+  family                   = each.key
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
@@ -14,8 +14,8 @@ resource "aws_ecs_task_definition" "task" {
 
   container_definitions = jsonencode([
     {
-      name  = "service-${count.index}"
-      image = var.ecr_repo_urls[count.index]
+      name  = each.key
+      image = "${aws_ecr_repository.repo[each.key].repository_url}:latest"
       portMappings = [
         {
           containerPort = 80
@@ -25,26 +25,26 @@ resource "aws_ecs_task_definition" "task" {
   ])
 }
 
-
 resource "aws_ecs_service" "service" {
-  count           = 3
-  name            = "service-${count.index}"
+  for_each        = toset(var.services)
+  name            = each.key
   cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.task[count.index].arn
+  task_definition = aws_ecs_task_definition.task[each.key].arn
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets = var.private_subnets
+    subnets         = var.private_subnets
     assign_public_ip = false
-    security_groups  = []
+    security_groups = []
   }
 
   load_balancer {
-    target_group_arn = var.target_group_arns[count.index]
-    container_name   = "service-${count.index}"
+    target_group_arn = var.target_group_arns[each.key]
+    container_name   = each.key
     container_port   = 80
   }
 }
+
 
 
 resource "aws_iam_role" "ecs_execution_role" {

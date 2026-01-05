@@ -22,3 +22,5 @@ variable "ecr_repo_urls" {
   description = "ECR repository URLs"
   type        = list(string)
 }
+
+variable "services" {}

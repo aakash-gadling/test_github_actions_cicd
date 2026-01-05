@@ -52,7 +52,6 @@ jobs:
         run: terraform output -json repo_urls > repo_urls.json
 
   docker-build:
-    name: Build & Push Docker Images
     runs-on: ubuntu-latest
     needs: terraform
   
@@ -67,22 +66,29 @@ jobs:
   
       - uses: aws-actions/amazon-ecr-login@v2
   
+      - uses: hashicorp/setup-terraform@v2
+  
+      - name: Terraform Init
+        working-directory: terraform/envs/dev
+        run: terraform init -input=false
+  
+      - name: Fetch ECR repo URLs
+        working-directory: terraform/envs/dev
+        run: terraform output -json repo_urls > repo_urls.json
+  
       - name: Build & Push Docker Images
         env:
           COMMIT_SHA: ${{ github.sha }}
         run: |
           for service_dir in services/*; do
             service_name=$(basename "$service_dir")
-          
+  
             repo=$(jq -r ".\"${service_name}\"" terraform/envs/dev/repo_urls.json)
-          
+  
             if [ "$repo" = "null" ] || [ -z "$repo" ]; then
-              echo "No ECR repo found for $service_name"
               continue
             fi
-          
-            echo "Building and pushing $service_name → $repo:$COMMIT_SHA"
-          
+  
             docker build -t "$repo:$COMMIT_SHA" "$service_dir"
             docker push "$repo:$COMMIT_SHA"
           done

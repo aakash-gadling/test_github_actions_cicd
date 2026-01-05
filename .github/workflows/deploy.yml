@@ -34,12 +34,22 @@ jobs:
           terraform init
           terraform apply -auto-approve
 
+      - name: Debug raw Terraform output
+        working-directory: terraform/envs/dev
+        run: |
+          terraform output repo_urls
+          terraform output -json repo_urls
+
       - name: Get ECR repo URLs
         id: ecr
         working-directory: terraform/envs/dev
         run: |
-          REPO_URLS=$(terraform output -json repo_urls)
-          echo "repo_urls=$(echo "$REPO_URLS" | jq -c .)" >> "$GITHUB_OUTPUT"
+          terraform output -json repo_urls > repo_urls.json
+          cat repo_urls.json
+          
+      - name: Fetch ECR repo URLs
+        working-directory: terraform/envs/dev
+        run: terraform output -json repo_urls > repo_urls.json
 
   docker-build:
     name: Build & Push Docker Images
@@ -59,24 +69,19 @@ jobs:
   
       - name: Build & Push Docker Images
         env:
-          REPO_URLS: ${{ needs.terraform.outputs.ecr_repo_urls }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
           for service_dir in services/*; do
             service_name=$(basename "$service_dir")
-            repo=$(echo "$REPO_URLS" | jq -r ".\"$service_name\"")
-  
-            if [ -z "$repo" ] || [ "$repo" = "null" ]; then
-              echo "No ECR repo found for $service_name, skipping..."
+      
+            repo=$(jq -r ".${service_name}" terraform/envs/dev/repo_urls.json)
+      
+            if [ "$repo" = "null" ]; then
+              echo "No ECR repo found for $service_name"
               continue
             fi
-  
-            echo "Building and pushing $service_name → $repo:$COMMIT_SHA"
-  
-            # Build directly with full ECR tag
+      
             docker build -t "$repo:$COMMIT_SHA" "$service_dir"
-  
-            # Push to ECR
             docker push "$repo:$COMMIT_SHA"
           done
 

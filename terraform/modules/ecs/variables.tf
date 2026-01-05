@@ -17,7 +17,6 @@ variable "target_group_arns" {
   type = map(string)
 }
 
-
 variable "services" {
   type = list(string)
 }
@@ -28,4 +27,9 @@ variable "ecr_repo_urls" {
 
 variable "alb_security_group_id" {
   type = string
+}
+
+variable "image_tag" {
+  description = "Docker image tag to deploy"
+  type        = string
 }

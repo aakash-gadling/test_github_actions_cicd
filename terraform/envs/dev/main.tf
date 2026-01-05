@@ -28,6 +28,7 @@ module "ecs" {
   ecr_repo_urls      = module.ecr.repo_urls
   services            = var.services
   alb_security_group_id = module.alb.alb_security_group_id
+  image_tag = var.image_tag
 }
 
 module "rds" {

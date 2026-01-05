@@ -12,6 +12,9 @@ jobs:
     outputs:
       ecr_repo_urls: ${{ steps.ecr.outputs.repo_urls }}
 
+    env:
+      TF_VAR_image_tag: ${{ github.sha }}
+      
     steps:
       - uses: actions/checkout@v3
 

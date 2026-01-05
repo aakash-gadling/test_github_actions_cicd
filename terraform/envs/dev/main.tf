@@ -8,6 +8,7 @@ module "vpc" {
 
 module "ecr" {
   source = "../../modules/ecr"
+  services = var.services
 }
 
 module "alb" {

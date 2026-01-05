@@ -1,124 +1,104 @@
-name: CI/CD ECS Deployment
+name: CI/CD – Terraform + ECS + ECR
 
 on:
   push:
     branches:
       - main
 
+env:
+  AWS_REGION: ap-south-1
+  CLUSTER_NAME: ecs-cluster
+
 jobs:
   terraform:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    outputs:
-      ecr_repo_urls: ${{ steps.ecr.outputs.repo_urls }}
 
-    env:
-      TF_VAR_image_tag: ${{ github.sha }}
-      
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      - uses: hashicorp/setup-terraform@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.7.5
 
-      - uses: aws-actions/configure-aws-credentials@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init & Apply
         working-directory: terraform/envs/dev
         run: |
-          terraform init
+          terraform init -input=false
           terraform apply -auto-approve
 
-      - name: Debug raw Terraform output
-        working-directory: terraform/envs/dev
-        run: |
-          terraform output repo_urls
-          terraform output -json repo_urls
-
-      - name: Get ECR repo URLs
-        id: ecr
-        working-directory: terraform/envs/dev
-        run: |
-          terraform output -json repo_urls > repo_urls.json
-          cat repo_urls.json
-          
-      - name: Fetch ECR repo URLs
-        working-directory: terraform/envs/dev
-        run: terraform output -json repo_urls > repo_urls.json
-
   docker-build:
+    name: Build & Push Docker Images
     runs-on: ubuntu-latest
     needs: terraform
-  
+
     steps:
-      - uses: actions/checkout@v3
-  
-      - uses: aws-actions/configure-aws-credentials@v2
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
-  
-      - uses: aws-actions/amazon-ecr-login@v2
-  
-      - uses: hashicorp/setup-terraform@v2
-  
-      - name: Terraform Init
-        working-directory: terraform/envs/dev
-        run: terraform init -input=false
-  
-      - name: Fetch ECR repo URLs
-        working-directory: terraform/envs/dev
-        run: terraform output -json repo_urls > repo_urls.json
-  
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Build & Push Docker Images
         env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
+          set -e
+
           for service_dir in services/*; do
             service_name=$(basename "$service_dir")
-  
-            repo=$(jq -r ".\"${service_name}\"" terraform/envs/dev/repo_urls.json)
-  
-            if [ "$repo" = "null" ] || [ -z "$repo" ]; then
-              continue
-            fi
-  
-            docker build -t "$repo:$COMMIT_SHA" "$service_dir"
-            docker push "$repo:$COMMIT_SHA"
-          done
 
+            ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${service_name}"
+
+            echo "=================================================="
+            echo "Building and pushing: $ECR_REPO:$COMMIT_SHA"
+            echo "=================================================="
+
+            docker build -t "$ECR_REPO:$COMMIT_SHA" "$service_dir"
+            docker push "$ECR_REPO:$COMMIT_SHA"
+          done
 
   ecs-deploy:
     name: Force ECS Deployment
     runs-on: ubuntu-latest
     needs: docker-build
-  
+
     steps:
-      - uses: actions/checkout@v3
-  
-      - uses: aws-actions/configure-aws-credentials@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
-  
-      - name: Force ECS Service Deployment
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Force ECS Service Deployments
         run: |
-          CLUSTER_NAME="ecs-cluster"
-  
+          set -e
+
           for service_dir in services/*; do
             service_name=$(basename "$service_dir")
-            echo "Forcing deployment for $service_name"
-  
+
+            echo "Forcing deployment for ECS service: $service_name"
+
             aws ecs update-service \
-              --cluster "$CLUSTER_NAME" \
+              --cluster "${CLUSTER_NAME}" \
               --service "$service_name" \
               --force-new-deployment
           done
-

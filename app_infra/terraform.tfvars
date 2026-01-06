@@ -1,0 +1,12 @@
+# Example terraform.tfvars
+aws_region = "ap-south-1"
+aws_account_id = "730335419572"
+image_name = "myapp"
+image_tag  = "v1"
+ecs_cluster_name = "prod-app-cluster"
+vpc_cidr = "10.0.0.0/16"
+public_subnet_cidrs = ["10.0.1.0/24","10.0.2.0/24"]
+az_count = 2
+desired_count = 1
+task_cpu = 512
+task_memory = 1024

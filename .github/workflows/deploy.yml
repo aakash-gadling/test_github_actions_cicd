@@ -31,74 +31,8 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init & Apply
-        working-directory: terraform/envs/dev
+        working-directory: app_infra/
         run: |
           terraform init -input=false
           terraform apply -auto-approve
-
-  docker-build:
-    name: Build & Push Docker Images
-    runs-on: ubuntu-latest
-    needs: terraform
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build & Push Docker Images
-        env:
-          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          COMMIT_SHA: ${{ github.sha }}
-        run: |
-          set -e
-
-          for service_dir in services/*; do
-            service_name=$(basename "$service_dir")
-
-            ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${service_name}"
-
-            echo "=================================================="
-            echo "Building and pushing: $ECR_REPO:$COMMIT_SHA"
-            echo "=================================================="
-
-            docker build -t "$ECR_REPO:$COMMIT_SHA" "$service_dir"
-            docker push "$ECR_REPO:$COMMIT_SHA"
-          done
-
-  ecs-deploy:
-    name: Force ECS Deployment
-    runs-on: ubuntu-latest
-    needs: docker-build
-
-    steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Force ECS Service Deployments
-        run: |
-          set -e
-
-          for service_dir in services/*; do
-            service_name=$(basename "$service_dir")
-
-            echo "Forcing deployment for ECS service: $service_name"
-
-            aws ecs update-service \
-              --cluster "${CLUSTER_NAME}" \
-              --service "$service_name" \
-              --force-new-deployment
-          done
+          terraform output -json
